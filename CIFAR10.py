@@ -13,6 +13,7 @@ import numpy as np
 import copy
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, random_split
+import torchvision.models as models
 
 
 # 固定 random seed（KAN 對 seed 非常敏感）
@@ -26,18 +27,19 @@ json_logs = []
 device = "cuda"
 
 model_name = ["MLP", "KAN", "WavKAN"]
-settings = [[784, 256, 128, 10], [784, 256, 64, 10], [784, 256, 32, 10], [784, 512, 256, 10], [784, 512, 128, 10], [784, 512, 512, 10], [784, 1024, 1024, 10]]
+settings = [[512, 256, 128, 10], [512, 256, 64, 10], [512, 256, 32, 10], [512, 512, 256, 10], [512, 512, 128, 10], [512, 512, 512, 10], [512, 1024, 1024, 10]]
 loss_fn = nn.CrossEntropyLoss()
 epochs = 100
 patience = 10
 
 transform = transforms.Compose([
-    transforms.ToTensor(),                # (1, 28, 28), value in [0,1]
-    transforms.Normalize((0.1307,), (0.3081,)),
-    transforms.Lambda(lambda x: x.view(-1))  # flatten to (784,)
+    transforms.Resize(32),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
+                         std=[0.2470, 0.2435, 0.2616])
 ])
 
-trainval_dataset = datasets.MNIST(
+trainval_dataset = datasets.CIFAR10(
     root="./data",
     train=True,
     download=True,
@@ -46,7 +48,7 @@ trainval_dataset = datasets.MNIST(
 n_train = int(len(trainval_dataset) * 0.9)
 n_val = len(trainval_dataset) - n_train
 train_dataset, val_dataset = random_split(trainval_dataset, [n_train, n_val])
-test_dataset = datasets.MNIST(
+test_dataset = datasets.CIFAR10(
     root="./data",
     train=False,
     download=True,
@@ -58,6 +60,14 @@ batch_size = 64
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+backbone = models.resnet18(pretrained=True)
+backbone = nn.Sequential(*list(backbone.children())[:-1])
+def extract_features(x):
+    with torch.no_grad():
+        features = backbone(x)
+        features = features.view(features.size(0), -1)  # (batch, 512)
+    return features
 
 for setting in settings:
     for model_n in model_name:
@@ -91,6 +101,7 @@ for setting in settings:
                 xb = xb.to(device)
                 yb = yb.to(device)
                 optimizer.zero_grad()
+                xb = extract_features(xb)
                 loss = model.compute_loss(xb, yb, loss_fn)
                 loss.backward()
                 optimizer.step()
@@ -106,6 +117,7 @@ for setting in settings:
                 xb = xb.to(device)
                 yb = yb.to(device)
                 optimizer.zero_grad()
+                xb = extract_features(xb)
                 predict = model(xb)
                 pred_class = predict.argmax(dim=1)
                 correct = (pred_class == yb).sum().item()
@@ -139,10 +151,11 @@ for setting in settings:
             xb = xb.to(device)
             yb = yb.to(device)
             optimizer.zero_grad()
+            xb = extract_features(xb)
             predict = model(xb)
             pred_class = predict.argmax(dim=1)
             correct = (pred_class == yb).sum().item()
-            test_performance += correct
+            val_performance += correct
             total += yb.size(0)
         print(f"test_performance: {test_performance/total:.3e}")
         json_log["test_performance"] = test_performance/total

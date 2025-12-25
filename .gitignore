@@ -1,6 +1,7 @@
 /data/*
 *.docx
-/2_*/*
-/exp*/*
+/2_*/
+/*/
+/exp*/
 /kan_venv
 /__pycache__
