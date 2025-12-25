@@ -61,7 +61,7 @@ train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-backbone = models.resnet18(pretrained=True)
+backbone = models.resnet18(pretrained=True).to(device)
 backbone = nn.Sequential(*list(backbone.children())[:-1])
 def extract_features(x):
     with torch.no_grad():

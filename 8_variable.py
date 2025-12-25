@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from KAN import *
 from WavKAN import *
+from MLP import MLP
 from tqdm import *
 from arithmetic_set import get_dataloader
 import os
@@ -27,38 +28,38 @@ def target_fn(x, noise_std=0.01):
     batch_size = x.size(0)
     device = x.device
 
-    freq_sin = torch.arange(1, 7, device=device) * torch.pi
-    term_sin = torch.sin(x[:, 0:6] * freq_sin)/(freq_sin**2).unsqueeze(0)
+    freq_sin = torch.arange(1, 4, device=device) * torch.pi
+    term_sin = torch.sin(x[:, 0:3] * freq_sin)/(freq_sin**2).unsqueeze(0)
 
-    freq_cos = torch.arange(1, 7, device=device) * torch.pi
-    term_cos = torch.cos(x[:, 6:12] * freq_cos)/(freq_cos**2).unsqueeze(0)
+    freq_cos = torch.arange(1, 4, device=device) * torch.pi
+    term_cos = torch.cos(x[:, 3:6] * freq_cos)/(freq_cos**2).unsqueeze(0)
 
-    powers = torch.arange(2, 6, device=device)
-    term_poly = (x[:, 12:16] ** powers)/torch.cumprod(powers, dim=0).unsqueeze(0)
+    powers = torch.arange(2, 4, device=device)
+    term_poly = (x[:, 6:8] ** powers)/torch.cumprod(powers, dim=0).unsqueeze(0)
 
     y = (
         term_sin.sum(dim=1)
         + term_cos.sum(dim=1)
         + term_poly.sum(dim=1)
-    )
+    )/8
 
     if noise_std > 0:
         y = y + noise_std * torch.randn(batch_size, device=device)
 
     return y
 
-model_name = ["KAN", "WavKAN"]
-settings = [[16, 16, 1], [16, 16, 16, 1], [16, 32, 1], [16, 32, 32, 1], [16, 64, 1], [16, 64, 64, 1], [16, 128, 1], [16, 128, 128, 1], [16, 256, 1], [16, 256, 256, 1]]
+model_name = ["KAN", "WavKAN", "MLP"]
+settings = [[8, 64, 64, 1], [8, 128, 128, 1], [8, 256, 256, 1], [8, 512, 512, 1]]
 loss_fn = nn.MSELoss()
 epochs = 50
 
 batch_size = 16
-_, train_dataloader = get_dataloader(target_fn, 8192, input_dim = 16, batch_size=batch_size, device=device)
-_, val_dataloader = get_dataloader(target_fn, 1024, input_dim = 16, batch_size=batch_size, device=device)
-_, test_dataloader = get_dataloader(target_fn, 512, input_dim = 16, batch_size=batch_size, device=device)
+_, train_dataloader = get_dataloader(target_fn, 65536, input_dim = 8, batch_size=batch_size, device=device)
+_, val_dataloader = get_dataloader(target_fn, 1024, input_dim = 8, batch_size=batch_size, device=device)
+_, test_dataloader = get_dataloader(target_fn, 512, input_dim = 8, batch_size=batch_size, device=device)
 
-for model_n in model_name:
-    for setting in settings:
+for setting in settings:
+    for model_n in model_name:
         json_log = {"model name": model_n, "layer": setting}
 
 
@@ -66,6 +67,8 @@ for model_n in model_name:
             model = KAN(layers_hidden=setting).to(device)
         elif model_n == "WavKAN":
             model = WavKAN(layers_hidden=setting).to(device)
+        else:
+            model = MLP(layers_hidden=setting).to(device)
         total_params = sum(p.numel() for p in model.parameters())
         json_log["total_params"] = total_params
 

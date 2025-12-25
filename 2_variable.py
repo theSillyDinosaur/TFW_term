@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from WavKAN import *
+from KAN import *
 from tqdm import *
 from arithmetic_set import get_dataloader
 import os
@@ -38,7 +39,7 @@ _, test_dataloader = get_dataloader(target_fn, 512, batch_size=batch_size, devic
 for setting in settings:
     json_log = {"layer": setting}
 
-    model = WavKAN(layers_hidden=setting).to(device)
+    model = KAN(layers_hidden=setting).to(device)
     total_params = sum(p.numel() for p in model.parameters())
     json_log["total_params"] = total_params
 
