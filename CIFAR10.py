@@ -155,7 +155,7 @@ for setting in settings:
             predict = model(xb)
             pred_class = predict.argmax(dim=1)
             correct = (pred_class == yb).sum().item()
-            val_performance += correct
+            test_performance += correct
             total += yb.size(0)
         print(f"test_performance: {test_performance/total:.3e}")
         json_log["test_performance"] = test_performance/total
